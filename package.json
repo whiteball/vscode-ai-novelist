@@ -2,6 +2,10 @@
   "name": "vscode-ai-novelist",
   "displayName": "vscode-ai-novelist",
   "description": "VSCode上でAIのべりすとのAPIを扱うための拡張です。 / extension for AI novelist's API on VSCode.",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:whiteball/vscode-ai-novelist.git"
+  },
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.81.0"
