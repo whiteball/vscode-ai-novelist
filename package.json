@@ -1,0 +1,199 @@
+{
+  "name": "vscode-ai-novelist",
+  "displayName": "vscode-ai-novelist",
+  "description": "VSCode上でAIのべりすとのAPIを扱うための拡張です。 / extension for AI novelist's API on VSCode.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.81.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-ai-novelist.getContinuation",
+        "title": "続きを書く(AIのべりすと)"
+      }
+    ],
+    "configuration": {
+      "title": "AIのべりすとAPI",
+      "properties": {
+        "ai_novelist_api.apiKey": {
+          "order": 0,
+          "type": "string",
+          "description": "AIのべりすとの開発者向けAPIページのAPIキーを設定してください。",
+          "default": ""
+        },
+        "ai_novelist_api.saveOutputToLogFile": {
+          "order": 1,
+          "type": "boolean",
+          "description": "この設定が有効の場合、AIの出力をログファイル(.history/yyyymmdd_hhMMss.txt)に保存します。",
+          "default": true
+        },
+        "ai_novelist_api.parameters.length": {
+          "order": 101,
+          "type": "integer",
+          "description": "出力トークン数の長さ(1～300)\n出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります。",
+          "default": 30,
+          "maximum": 300,
+          "minimum": 1
+        },
+        "ai_novelist_api.parameters.temperature": {
+          "order": 102,
+          "type": "number",
+          "default": 0.7,
+          "description": "ランダム度(0～2.5)\n語彙が単調に感じる場合は上げてみてください。上げすぎると支離滅裂な出力なります。",
+          "maximum": 2.5,
+          "minimum": 0
+        },
+        "ai_novelist_api.parameters.top_p": {
+          "order": 103,
+          "type": "number",
+          "default": 0.7,
+          "description": "Top Pサンプリング(0.01～1.0)\n低いほど出現確率の低いトークンが除外されます。極端に関係のない語彙が出ることを防ぎます。",
+          "maximum": 1.0,
+          "minimum": 0.01
+        },
+        "ai_novelist_api.parameters.rep_pen": {
+          "order": 104,
+          "type": "number",
+          "default": 1.15,
+          "description": "繰り返しペナルティ(1.0～2.0)\n同じトークンが出力されにくさの度合いを指定します。数字を大きくすると、同じトークンが出力されにくくなります。値が高すぎると出力が突飛になりすぎる可能性があります。",
+          "maximum": 2.0,
+          "minimum": 1.0
+        },
+        "ai_novelist_api.parameters.top_k": {
+          "order": 105,
+          "type": "integer",
+          "default": 140,
+          "description": "Top Kサンプリング(1～500)\n出力が確率上位nトークンのみから選択されるようにします。",
+          "maximum": 500,
+          "minimum": 1
+        },
+        "ai_novelist_api.parameters.top_a": {
+          "order": 106,
+          "type": "number",
+          "default": 0,
+          "description": "Top Aサンプリング(0～1.0)\n確率が(一番確率の高いトークン^2 * Top A)以下のトークンを除外します。",
+          "maximum": 1.0,
+          "minimum": 0.0
+        },
+        "ai_novelist_api.parameters.rep_pen_range": {
+          "order": 107,
+          "type": "integer",
+          "default": 1024,
+          "description": "繰り返しペナルティを適用する範囲(0～2048)\nこの範囲にあるトークンが出力される可能性があるときにペナルティがかかります。",
+          "maximum": 2048,
+          "minimum": 0
+        },
+        "ai_novelist_api.parameters.rep_pen_slope": {
+          "order": 108,
+          "type": "number",
+          "default": 3.00,
+          "description": "繰り返しペナルティの傾斜(0.01～10)\nこの値を大きくすると、入力文章末尾から離れた位置にあるトークンほど、より大きなペナルティがかかるようになります。",
+          "maximum": 10.0,
+          "minimum": 0.01
+        },
+        "ai_novelist_api.parameters.rep_pen_pres": {
+          "order": 109,
+          "type": "integer",
+          "default": 0,
+          "description": "コンテキスト中に単語が出た回数に依存する繰り返しペナルティ(0～100)",
+          "maximum": 100,
+          "minimum": 0
+        },
+        "ai_novelist_api.parameters.typical_p": {
+          "order": 110,
+          "type": "number",
+          "default": 1.0,
+          "description": "Typicalサンプリング(0.01～1.0)\n出力確率の下位n%のトークンのみを採用します。",
+          "maximum": 1.0,
+          "minimum": 0.01
+        },
+        "ai_novelist_api.parameters.badwords": {
+          "order": 111,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["[#ユーザー]", "[#アシスタント]", "<unk>", "<s>", "</s>", "[", "\\n[", "[["],
+          "description": "禁止ワードを設定します。"
+        },
+        "ai_novelist_api.parameters.logit_bias": {
+          "order": 112,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "トークン文字列。必ず1トークンだけを指定してください。"
+              },
+              "bias": {
+                "type": "number",
+                "description": "バイアス確率。logit spaceに作用します。基本的には-5から+5程度が適正です。",
+                "default": 0
+              }
+            }
+          },
+          "default": [],
+          "description": "個別のトークンの出現率を調整します。バイアス確率はlogit spaceに作用します。基本的には-5から+5程度が適正です。",
+          "additionalProperties": false
+        },
+        "ai_novelist_api.parameters.stoptokens": {
+          "order": 114,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "出力生成中にここで指定したトークンが現れると、強制的に出力が打ち切られます。"
+        },
+        "ai_novelist_api.parameters.model": {
+          "order": 115,
+          "type": "string",
+          "default": "supertrin",
+          "enum": ["supertrin", "damsel"],
+          "enumDescriptions": ["スーパーとりんさまモデル", "やみおとめモデル"],
+          "description": "使用するモデルを選択できます。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "20.2.5",
+    "@types/vscode": "^1.81.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.8",
+    "@typescript-eslint/parser": "^5.59.8",
+    "@vscode/test-electron": "^2.3.2",
+    "eslint": "^8.41.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "ts-loader": "^9.4.3",
+    "typescript": "^5.1.3",
+    "webpack": "^5.85.0",
+    "webpack-cli": "^5.1.1"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "license": "MIT"
+}
