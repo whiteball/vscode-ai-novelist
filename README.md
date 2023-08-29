@@ -95,3 +95,8 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
 
 * [AIのべりすと](https://ai-novel.com/)
 * [AIのべりすと APIマニュアル](https://ai-novel.com/account_api_help.php)
+
+## クレジット
+
+この拡張はMITライセンスで提供されている[VS Code Extension Samples](https://github.com/microsoft/vscode-extension-samples)のコードを利用しています。  
+VS Code Extension Samples: Copyright (c) Microsoft Corporation.
