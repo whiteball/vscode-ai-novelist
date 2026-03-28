@@ -177,9 +177,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			}
 			
-			const blob: Uint8Array = Buffer.from(currentText);
-			
-			vscode.workspace.fs.writeFile(path, blob);
+			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(currentText));
 		}
 	}
 	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuation', async () => {
