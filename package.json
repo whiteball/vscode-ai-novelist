@@ -5,7 +5,10 @@
   "publisher": "whiteball",
   "repository": {
     "type": "git",
-    "url": "git@github.com:whiteball/vscode-ai-novelist.git"
+    "url": "https://github.com/whiteball/vscode-ai-novelist.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whiteball/vscode-ai-novelist/issues"
   },
   "version": "0.0.1",
   "engines": {
