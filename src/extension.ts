@@ -136,7 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const body = Object(await res.json());
 		return formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF);
 	}
-	async function saveLog(currentText: string, range:vscode.Range, activeDocument: vscode.TextDocument, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
+	async function saveLog(currentText: string, range:vscode.Range, activeDocument: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
 		const uri = activeDocument.uri.toString();
 		let lastGenerated: Date;
 		if (outputHistory.has(uri)) {
@@ -175,15 +175,9 @@ export function activate(context: vscode.ExtensionContext) {
 			// ファイルに保存
 			const dateString = formatDate(lastGenerated);
 
-			const path = vscode.Uri.joinPath(activeDir.uri, '.history/' + dateString + '.txt');
-			try {
-				const buf = await vscode.workspace.fs.readFile(path);
-				currentText = buf.toString() + '\n\n' + currentText;
-			} catch (e) {
-
-			}
-			
-			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(currentText));
+			const path = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/history/' + dateString + '.json');
+			const logContent = JSON.stringify({ output: currentText, params: parameters }, null, 2);
+			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(logContent));
 		}
 	}
 	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuation', async () => {
@@ -230,7 +224,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// 履歴に追加
 			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt),document, activeDir, true);
+			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, activeDir, true);
 			retryButton.show();
 		} catch (error) {
 			let message = '';
@@ -310,7 +304,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// 履歴に追加
 			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt),document, activeDir);
+			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, activeDir);
 			retryButton.show();
 		} catch (error) {
 			let message = '';
