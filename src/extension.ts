@@ -105,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		return parameters;
 	}
-	async function queryServer(apiKey:string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined):Promise<string> {
+	async function queryServer(apiKey:string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined):Promise<{output: string, input: string}> {
 		let input = '';
 		if (selections) {
 			let selectedText: string[] = [];
@@ -144,9 +144,9 @@ export function activate(context: vscode.ExtensionContext) {
 			})
 		});
 		const body = Object(await res.json());
-		return formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF);
+		return { output: formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF), input };
 	}
-	async function saveLog(currentText: string, range:vscode.Range, activeDocument: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
+	async function saveLog(currentText: string, range:vscode.Range, activeDocument: vscode.TextDocument, parameters: object, input: string, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
 		const uri = activeDocument.uri.toString();
 		let lastGenerated: Date;
 		if (outputHistory.has(uri)) {
@@ -186,7 +186,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const dateString = formatDate(lastGenerated);
 
 			const path = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/history/' + dateString + '.json');
-			const logContent = JSON.stringify({ output: currentText, params: parameters }, null, 2);
+			const logContent = JSON.stringify({ output: currentText, params: parameters, input }, null, 2);
 			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(logContent));
 		}
 	}
@@ -224,7 +224,7 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
 				return;
 			}
-			let currentText = await queryServer(apiKey, document, parameters, activeDir);
+			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir);
 
 			const line = document.lineCount;
 			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
@@ -234,7 +234,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// 履歴に追加
 			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, activeDir, true);
+			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, input, activeDir, true);
 			retryButton.show();
 		} catch (error) {
 			let message = '';
@@ -304,7 +304,7 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 
-			let currentText = await queryServer(apiKey, document, parameters, activeDir);
+			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir);
 
 			const line = document.lineCount;
 			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
@@ -314,7 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// 履歴に追加
 			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, activeDir);
+			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, input, activeDir);
 			retryButton.show();
 		} catch (error) {
 			let message = '';
