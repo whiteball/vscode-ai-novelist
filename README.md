@@ -55,7 +55,18 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
 ```
 
 * `ai_novelist_api.parameters.stoptokens`: 出力生成中にここで指定したトークンが現れると、強制的に出力が打ち切られます。
-* `ai_novelist_api.parameters.model`: 使用するモデルを選択できます。"supertrin"(スーパーとりんさまモデル)、または"damsel"(やみおとめモデル)があります。
+* `ai_novelist_api.parameters.model`: 使用するモデルを選択できます。利用可能なモデルは以下の通りです。(2026/03/29現在)
+  * 現行モデル
+    * derrida_03
+    * spiko_max
+    * spiko
+    * spiko_solid
+    * damsel_ray
+  * レガシーモデル
+    * supertrin_highpres
+    * supertrin_maxpres
+    * supertrin
+    * damsel
 
 `.ai_novelist_param.json`に設定を書く場合は、下記の例のように設定してください。
 
@@ -75,7 +86,7 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
     "logit_bias": "【<<|>>_",
     "logit_bias_values": "-2.0|-0.1",
     "stoptokens": "トマト<<|>>りんご",
-    "model": "supertrin",
+    "model": "spiko",
 }
 ```
 
