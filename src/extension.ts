@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 
-import { formatOutput, formatDate } from './format';
+import { formatOutput, formatDate, normalizeInput } from './format';
 
 // refer: https://ai-novel.com/account_api_help.php
 
@@ -130,6 +130,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			}
 		}
+		input = normalizeInput(input);
 		const res = await fetch('https://api.tringpt.com/api', {
 			method: 'POST',
 			headers: {

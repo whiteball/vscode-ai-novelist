@@ -15,6 +15,15 @@ export function formatOutput(raw: string, forwardLine: string = '', isLF = false
 	return raw;
 }
 /**
+ * APIに送信するテキストを正規化する。
+ *
+ * @param input 送信テキスト
+ * @returns 正規化後の文字列
+ */
+export function normalizeInput(input: string): string {
+	return input.replace(/(\r?\n){3,}/g, '$1$1');
+}
+/**
  * 日付をyyyymmdd_hhMMss形式の文字列に変換する。
  * 
  * @param date 変換対象の日付
