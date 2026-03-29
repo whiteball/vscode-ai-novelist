@@ -105,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		return parameters;
 	}
-	async function queryServer(apiKey:string, document: vscode.TextDocument, parameters: object, selections: vscode.Selection[] | undefined = undefined):Promise<string> {
+	async function queryServer(apiKey:string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined):Promise<string> {
 		let input = '';
 		if (selections) {
 			let selectedText: string[] = [];
@@ -119,6 +119,16 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		if (!input) {
 			throw Error('入力文字列が空です。');
+		}
+		if (activeDir) {
+			const memoryPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/memory.txt');
+			try {
+				const buf = await vscode.workspace.fs.readFile(memoryPath);
+				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+				input = buf.toString() + eol + eol + input;
+			} catch (e) {
+
+			}
 		}
 		const res = await fetch('https://api.tringpt.com/api', {
 			method: 'POST',
@@ -214,7 +224,7 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
 				return;
 			}
-			let currentText = await queryServer(apiKey, document, parameters);
+			let currentText = await queryServer(apiKey, document, parameters, activeDir);
 
 			const line = document.lineCount;
 			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
@@ -294,7 +304,7 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 
-			let currentText = await queryServer(apiKey, document, parameters);
+			let currentText = await queryServer(apiKey, document, parameters, activeDir);
 
 			const line = document.lineCount;
 			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
