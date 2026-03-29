@@ -349,7 +349,7 @@ export function activate(context: vscode.ExtensionContext) {
 		
 		const decoratedOutput: vscode.DecorationOptions[] = [];
 		for (const output of last) {
-			if (document.getText(output.range) === output.text) {
+			if (document.getText(output.range).replace(/\r\n/g, '\n').trimEnd() === output.text.replace(/\r\n/g, '\n').trimEnd()) {
 				const decoration: vscode.DecorationOptions = { range: output.range, hoverMessage: 'AI出力文' };
 				decoratedOutput.push(decoration);
 				break;
