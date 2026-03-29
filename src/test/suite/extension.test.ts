@@ -1,15 +1,19 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
 
 suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+	test('拡張機能が登録されている', async () => {
+		const ext = vscode.extensions.getExtension('whiteball.vscode-ai-novelist');
+		assert.ok(ext, '拡張機能が見つかりません');
+	});
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	test('getContinuationコマンドが登録されている', async () => {
+		const commands = await vscode.commands.getCommands();
+		assert.ok(commands.includes('vscode-ai-novelist.getContinuation'));
+	});
+
+	test('retryコマンドが登録されている', async () => {
+		const commands = await vscode.commands.getCommands();
+		assert.ok(commands.includes('vscode-ai-novelist.retry'));
 	});
 });
