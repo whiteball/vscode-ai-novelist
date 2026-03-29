@@ -129,6 +129,31 @@ export function activate(context: vscode.ExtensionContext) {
 			} catch (e) {
 
 			}
+
+			const notePath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/note.txt');
+			try {
+				const noteBuf = await vscode.workspace.fs.readFile(notePath);
+				const noteText = noteBuf.toString();
+				let noteLine = 3;
+				try {
+					const settingsBuf = await vscode.workspace.fs.readFile(
+						vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/settings.json')
+					);
+					const settings = JSON.parse(settingsBuf.toString());
+					if (typeof settings.note_line === 'number') {
+						noteLine = Math.min(20, Math.max(1, Math.floor(settings.note_line)));
+					}
+				} catch (e) {
+
+				}
+				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+				const lines = input.split(/\r?\n/);
+				const insertAt = Math.max(0, lines.length - noteLine);
+				lines.splice(insertAt, 0, noteText);
+				input = lines.join(eol);
+			} catch (e) {
+
+			}
 		}
 		input = normalizeInput(input);
 		const res = await fetch('https://api.tringpt.com/api', {
