@@ -71,11 +71,17 @@ export function activate(context: vscode.ExtensionContext) {
 	async function loadParameters(config: vscode.WorkspaceConfiguration, activeDir: vscode.WorkspaceFolder | undefined): Promise<Object> {
 		let parameters = {...config.parameters};
 		if (activeDir) {
-			const path = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist_param.json');
+			const paramJsonPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/param.json');
 			try {
-				const buf = await vscode.workspace.fs.readFile(path);
-				const paramByFile = JSON.parse(buf.toString());
-				parameters = {...parameters, ...paramByFile};
+				const buf = await vscode.workspace.fs.readFile(paramJsonPath);
+				parameters = {...parameters, ...JSON.parse(buf.toString())};
+			} catch (e) {
+
+			}
+			const legacyPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist_param.json');
+			try {
+				const buf = await vscode.workspace.fs.readFile(legacyPath);
+				parameters = {...parameters, ...JSON.parse(buf.toString())};
 			} catch (e) {
 
 			}
