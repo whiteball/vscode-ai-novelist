@@ -25,7 +25,7 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
 ## 設定
 
 * `ai_novelist_api.apiKey`: AIのべりすとの開発者向けAPIページのAPIキーを設定してください。設定しないとAPIは利用できません。
-* `ai_novelist_api.saveOutputToLogFile`: この設定が有効の場合、AIの出力をログファイル(.history/yyyymmdd_hhMMss.txt)に保存します。
+* `ai_novelist_api.saveOutputToLogFile`: この設定が有効の場合、AIの出力をログファイル(`.ai_novelist/history/yyyymmdd_hhMMss.json`)に保存します。パラメータと送信テキスト全文も記録されます。
 * `ai_novelist_api.parameters.length`: 出力トークン数の長さ(1～300)。出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります
 * `ai_novelist_api.parameters.temperature`: ランダム度(0～2.5)。語彙が単調に感じる場合は上げてみてください。上げすぎると支離滅裂な出力なります。
 * `ai_novelist_api.parameters.top_p`: Top Pサンプリング(0.01～1.0)。低いほど出現確率の低いトークンが除外されます。極端に関係のない語彙が出ることを防ぎます。
@@ -68,6 +68,8 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
     * supertrin
     * damsel
 
+パラメータの読み込み優先順位は「拡張全体の設定 < `.ai_novelist/param.json` < `.ai_novelist_param.json`」です。後から読まれるファイルの値が優先されます。
+
 `.ai_novelist_param.json`に設定を書く場合は、下記の例のように設定してください。
 
 ```json
@@ -90,17 +92,25 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
 }
 ```
 
+## ワークスペースファイル
+
+`.ai_novelist/`ディレクトリにワークスペースごとの設定ファイルを置くことができます。
+
+| ファイル | 内容 |
+| --- | --- |
+| `param.json` | APIパラメータ（`.ai_novelist_param.json`より低優先） |
+| `settings.json` | 拡張の動作設定（現在は`note_line`のみ） |
+| `memory.txt` | メモリー：送信テキストの**先頭**に常に挿入されるテキスト |
+| `note.txt` | 脚注：送信テキストの末尾から`note_line`行目の直前に挿入されるテキスト |
+
 ## 今後の機能追加予定
 
 * 選択範囲の続きを書く
-* メモリ/脚注
 * キャラクターブック
 
 ## リリースノート
 
-### v0.0.1
-
-初期リリース。
+[CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ## リンク
 
