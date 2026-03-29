@@ -187,7 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const dateString = formatDate(lastGenerated);
 
 			const path = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/history/' + dateString + '.json');
-			const logContent = JSON.stringify({ output: currentText, params: parameters, input }, null, 2);
+			const logContent = JSON.stringify({ output: currentText, params: { text: input, ...parameters } }, null, 2);
 			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(logContent));
 		}
 	}
