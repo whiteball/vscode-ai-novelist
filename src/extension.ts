@@ -121,6 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
 			throw Error('入力文字列が空です。');
 		}
 		let memory = '';
+		let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
 		if (activeDir) {
 			const memoryPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/memory.txt');
 			try {
@@ -130,41 +131,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 			}
 
-			const notePath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/note.txt');
-			try {
-				const noteBuf = await vscode.workspace.fs.readFile(notePath);
-				const noteText = noteBuf.toString();
-				let noteLine = 3;
-				try {
-					const settingsBuf = await vscode.workspace.fs.readFile(
-						vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/settings.json')
-					);
-					const settings = JSON.parse(settingsBuf.toString());
-					if (typeof settings.note_line === 'number') {
-						noteLine = Math.min(20, Math.max(1, Math.floor(settings.note_line)));
-					}
-				} catch (e) {
-
-				}
-				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-				const lines = input.split(/\r?\n/);
-				const insertAt = Math.max(0, lines.length - noteLine);
-				lines.splice(insertAt, 0, noteText);
-				input = lines.join(eol);
-			} catch (e) {
-
-			}
-		}
-		let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
-		if (activeDir) {
+			let noteLine = 3;
 			try {
 				const settingsBuf = await vscode.workspace.fs.readFile(
 					vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/settings.json')
 				);
 				const settings = JSON.parse(settingsBuf.toString());
+				if (typeof settings.note_line === 'number') {
+					noteLine = Math.min(20, Math.max(1, Math.floor(settings.note_line)));
+				}
 				if (typeof settings.send_limit === 'number') {
 					sendLimit = Math.max(0, Math.floor(settings.send_limit));
 				}
+			} catch (e) {
+
+			}
+
+			const notePath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/note.txt');
+			try {
+				const noteBuf = await vscode.workspace.fs.readFile(notePath);
+				const noteText = noteBuf.toString();
+				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+				const lines = input.split(/\r?\n/);
+				const insertAt = Math.max(0, lines.length - noteLine);
+				lines.splice(insertAt, 0, noteText);
+				input = lines.join(eol);
 			} catch (e) {
 
 			}
