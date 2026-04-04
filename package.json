@@ -50,6 +50,13 @@
           "minimum": 0,
           "description": "APIに送信するテキストの最大文字数。0の場合は制限なし。制限を超えた場合は先頭から切り捨てられます。.ai_novelist/settings.jsonのsend_limitキーで上書き可能です。"
         },
+        "ai_novelist_api.chara_book_search_range": {
+          "order": 3,
+          "type": "integer",
+          "default": 2000,
+          "minimum": 0,
+          "description": "キャラクターブックのファイル名を検索する範囲（送信テキスト末尾からの文字数）。0の場合はテキスト全体を検索します。.ai_novelist/settings.jsonのchara_book_search_rangeキーで上書き可能です。"
+        },
         "ai_novelist_api.parameters.length": {
           "order": 101,
           "type": "integer",

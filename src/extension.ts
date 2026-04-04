@@ -122,6 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		let memory = '';
 		let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
+		let charaBookSearchRange: number = vscode.workspace.getConfiguration('ai_novelist_api').get('chara_book_search_range') ?? 2000;
 		if (activeDir) {
 			const memoryPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/memory.txt');
 			try {
@@ -143,6 +144,9 @@ export function activate(context: vscode.ExtensionContext) {
 				if (typeof settings.send_limit === 'number') {
 					sendLimit = Math.max(0, Math.floor(settings.send_limit));
 				}
+				if (typeof settings.chara_book_search_range === 'number') {
+					charaBookSearchRange = Math.max(0, Math.floor(settings.chara_book_search_range));
+				}
 			} catch (e) {
 
 			}
@@ -160,7 +164,41 @@ export function activate(context: vscode.ExtensionContext) {
 
 			}
 		}
-		input = normalizeInput(input, memory, sendLimit);
+		const charaBookTexts: string[] = [];
+		if (activeDir) {
+			try {
+				const charaBooksDir = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/chara_books');
+				const entries = await vscode.workspace.fs.readDirectory(charaBooksDir);
+				const searchTarget = charaBookSearchRange > 0
+					? input.slice(Math.max(0, input.length - charaBookSearchRange))
+					: input;
+				const txtFiles = entries
+					.filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.txt'))
+					.map(([name]) => {
+						const hasOrder = /^\d+\./.test(name);
+						const order = hasOrder ? parseInt(name.split('.')[0]) : 100;
+						const searchKey = hasOrder
+							? name.replace(/^\d+\./, '').replace(/\.txt$/, '')
+							: name.replace(/\.txt$/, '');
+						return { name, order, searchKey };
+					})
+					.filter(f => searchTarget.includes(f.searchKey))
+					.sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name));
+				for (const file of txtFiles) {
+					try {
+						const buf = await vscode.workspace.fs.readFile(
+							vscode.Uri.joinPath(charaBooksDir, file.name)
+						);
+						charaBookTexts.push(buf.toString());
+					} catch (e) {
+
+					}
+				}
+			} catch (e) {
+
+			}
+		}
+		input = normalizeInput(input, memory, charaBookTexts, sendLimit);
 		const res = await fetch('https://api.tringpt.com/api', {
 			method: 'POST',
 			headers: {
