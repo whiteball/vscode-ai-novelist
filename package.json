@@ -43,6 +43,13 @@
           "description": "この設定が有効の場合、AIの出力をログファイル(.history/yyyymmdd_hhMMss.txt)に保存します。",
           "default": true
         },
+        "ai_novelist_api.send_limit": {
+          "order": 2,
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "description": "APIに送信するテキストの最大文字数。0の場合は制限なし。制限を超えた場合は先頭から切り捨てられます。.ai_novelist/settings.jsonのsend_limitキーで上書き可能です。"
+        },
         "ai_novelist_api.parameters.length": {
           "order": 101,
           "type": "integer",

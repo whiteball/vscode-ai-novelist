@@ -120,12 +120,12 @@ export function activate(context: vscode.ExtensionContext) {
 		if (!input) {
 			throw Error('入力文字列が空です。');
 		}
+		let memory = '';
 		if (activeDir) {
 			const memoryPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/memory.txt');
 			try {
 				const buf = await vscode.workspace.fs.readFile(memoryPath);
-				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-				input = buf.toString() + eol + eol + input;
+				memory = buf.toString();
 			} catch (e) {
 
 			}
@@ -155,7 +155,21 @@ export function activate(context: vscode.ExtensionContext) {
 
 			}
 		}
-		input = normalizeInput(input);
+		let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
+		if (activeDir) {
+			try {
+				const settingsBuf = await vscode.workspace.fs.readFile(
+					vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/settings.json')
+				);
+				const settings = JSON.parse(settingsBuf.toString());
+				if (typeof settings.send_limit === 'number') {
+					sendLimit = Math.max(0, Math.floor(settings.send_limit));
+				}
+			} catch (e) {
+
+			}
+		}
+		input = normalizeInput(input, memory, sendLimit);
 		const res = await fetch('https://api.tringpt.com/api', {
 			method: 'POST',
 			headers: {
