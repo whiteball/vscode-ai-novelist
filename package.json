@@ -22,6 +22,25 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "views": {
+      "vscode-ai-novelist-assistant-view": [
+        {
+          "type": "webview",
+          "id": "vscode-ai-novelist.assistantView",
+          "name": "AIのべりすと アシスタント",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vscode-ai-novelist-assistant-view",
+          "title": "AIのべりすと アシスタント",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "vscode-ai-novelist.getContinuation",

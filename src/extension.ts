@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { loadParameters, queryServer } from './api';
 import { writeLogFile } from './logger';
+import { AssistantViewProvider } from './assistantViewProvider';
 
 /** AI生成テキストの1件分の履歴。リトライおよびDecoration更新に使用する。 */
 class HistoryItem {
@@ -63,6 +64,11 @@ export function activate(context: vscode.ExtensionContext) {
 	loadingButton.text = 'AI接続中……';
 	context.subscriptions.push(loadingButton);
 	loadingButton.hide();
+
+	const assistantView = new AssistantViewProvider(context.extensionUri);
+	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
+		AssistantViewProvider.viewType, assistantView
+	));
 
 	const outputHistory = new Map<string, HistoryItem[]>();
 	const outputHistoryAt = new Map<string, Date>();
