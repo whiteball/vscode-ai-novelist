@@ -61,9 +61,10 @@ export async function loadParameters(config: vscode.WorkspaceConfiguration, acti
  * @param parameters APIパラメータ（`loadParameters` で構築したもの）
  * @param activeDir アクティブなワークスペースフォルダ（undefined の場合は補助ファイルの読み込みをスキップ）
  * @param selections 選択範囲（undefined の場合はドキュメント全体を送信）
+ * @param appendText ドキュメントテキストの末尾に追記する文字列（メモリー・脚注・正規化の前に結合される）
  * @returns `output`（AI出力テキスト）と `input`（実際に送信したテキスト）のペア
  */
-export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined): Promise<{output: string, input: string}> {
+export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, appendText: string | undefined = undefined): Promise<{output: string, input: string}> {
 	let input = '';
 	if (selections) {
 		let selectedText: string[] = [];
@@ -113,12 +114,27 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 			const noteBuf = await vscode.workspace.fs.readFile(notePath);
 			const noteText = noteBuf.toString();
 			const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-			const lines = input.split(/\r?\n/);
-			const insertAt = Math.max(0, lines.length - noteLine);
-			lines.splice(insertAt, 0, noteText);
-			input = lines.join(eol);
+			if (appendText !== undefined) {
+				// appendText内の{__note__}を置換、なければ先頭に追加
+				if (appendText.includes('{__note__}')) {
+					appendText = appendText.replace('{__note__}', noteText);
+				} else {
+					appendText = noteText + eol + appendText;
+				}
+			} else {
+				// 通常時：入力本体のnote_line行目に挿入
+				const lines = input.split(/\r?\n/);
+				const insertAt = Math.max(0, lines.length - noteLine);
+				lines.splice(insertAt, 0, noteText);
+				input = lines.join(eol);
+			}
 		} catch (e) {
 
+		} finally {
+			// noteが存在しないなら、{__note__}の除去だけ行う
+			if (appendText !== undefined) {
+				appendText = appendText.replace('/\{__note__\}(\r?\n)?/', '');
+			}
 		}
 	}
 	const charaBookTexts: string[] = [];
@@ -154,6 +170,9 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		} catch (e) {
 
 		}
+	}
+	if (appendText) {
+		input += appendText;
 	}
 	input = normalizeInput(input, memory, charaBookTexts, sendLimit);
 	const res = await fetch('https://api.tringpt.com/api', {

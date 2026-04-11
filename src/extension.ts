@@ -69,6 +69,45 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
 		AssistantViewProvider.viewType, assistantView
 	));
+	assistantView.onSend = async (userInput: string) => {
+		if (lock) {
+			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
+			return;
+		}
+		const activeDir = vscode.workspace.workspaceFolders?.[0];
+		const config = vscode.workspace.getConfiguration('ai_novelist_api');
+		const apiKey = config.apiKey;
+		if (!apiKey) {
+			vscode.window.showErrorMessage('APIキーが設定されていません。');
+			return;
+		}
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			vscode.window.showErrorMessage('エディタが選択されていません。');
+			return;
+		}
+		const eol = editor.document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+		const appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + userInput + eol + '[#アシスタント]' + eol;
+		const parameters = await loadParameters(config, activeDir);
+		lock = true;
+		try {
+			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, appendText);
+			assistantView.setOutput(output);
+			const endLine = editor.document.lineCount - 1;
+			const endPos = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
+			await saveLog(output, new vscode.Range(endPos, endPos), editor.document, parameters, input, activeDir, true);
+		} catch (error) {
+			let message = '';
+			if (error instanceof Error) {
+				message = error.message;
+			} else if (typeof error === 'string') {
+				message = error;
+			}
+			vscode.window.showErrorMessage('接続エラー:' + message);
+		} finally {
+			lock = false;
+		}
+	};
 
 	const outputHistory = new Map<string, HistoryItem[]>();
 	const outputHistoryAt = new Map<string, Date>();

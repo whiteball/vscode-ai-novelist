@@ -8,8 +8,6 @@
 		}
 
 		const input = document.getElementById('input');
-		element.innerHTML = input?.value;
-
 		vscode.postMessage({
 			type: 'send',
 			text: input?.value ?? ''

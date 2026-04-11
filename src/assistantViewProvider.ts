@@ -1,4 +1,3 @@
-import { text } from 'stream/consumers';
 import * as vscode from 'vscode';
 
 export class AssistantViewProvider implements vscode.WebviewViewProvider {
@@ -27,12 +26,10 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
 		webviewView.webview.onDidReceiveMessage(data => {
-			console.debug(data);
 			switch (data.type) {
 				case 'send':
 					{
-						// this.onSend?.(data.text);
-						this.setOutput('test\n' + data.text);
+						this.onSend?.(data.text);
 					}
 			}
 		});
