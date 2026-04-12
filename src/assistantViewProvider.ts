@@ -29,7 +29,7 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			switch (data.type) {
 				case 'send':
 					{
-						this.onSend?.(data.text);
+						this.onSend?.(data.text, data.writeToEditor ?? false);
 					}
 			}
 		});
@@ -61,6 +61,10 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			<body>
 				<h3>指示</h3>
 				<textarea id="input"></textarea><br>
+				<div class="option-area">
+					<input type="checkbox" id="write-to-editor">
+					<label for="write-to-editor">エディタに出力</label>
+				</div>
 				<div class="button-area">
 					<button id="send-button">送信</button>
 				</div>

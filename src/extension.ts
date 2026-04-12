@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
 		AssistantViewProvider.viewType, assistantView
 	));
-	assistantView.onSend = async (userInput: string) => {
+	assistantView.onSend = async (userInput: string, writeToEditor: boolean) => {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
 			return;
@@ -94,8 +94,16 @@ export function activate(context: vscode.ExtensionContext) {
 			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, appendText);
 			assistantView.setOutput(output);
 			const endLine = editor.document.lineCount - 1;
-			const endPos = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
-			await saveLog(output, new vscode.Range(endPos, endPos), editor.document, parameters, input, activeDir, true);
+			const startAt = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
+			let logRange = new vscode.Range(startAt, startAt);
+			if (writeToEditor) {
+				await editor.edit(function (builder) {
+					builder.replace(startAt, output);
+				}, { undoStopBefore: true, undoStopAfter: true });
+				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + output.length);
+				logRange = new vscode.Range(startAt, endAt);
+			}
+			await saveLog(output, logRange, editor.document, parameters, input, activeDir, true);
 		} catch (error) {
 			let message = '';
 			if (error instanceof Error) {
