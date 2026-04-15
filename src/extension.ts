@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
 		AssistantViewProvider.viewType, assistantView
 	));
-	assistantView.onSend = async (userInput: string, writeToEditor: boolean) => {
+	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean) => {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
 			return;
@@ -87,20 +87,52 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		const eol = editor.document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-		const appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + userInput + eol + '[#アシスタント]' + eol;
+		const thinkSuffix = thinkingMode ? '<think>' + eol : '';
+		const appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + userInput + eol + '[#アシスタント]' + eol + thinkSuffix;
 		const parameters = await loadParameters(config, activeDir);
 		lock = true;
 		try {
 			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, appendText);
-			assistantView.setOutput(output);
+
+			// 思考内容と通常出力を分離する
+			let thinkingContent = '';
+			let actualOutput = output;
+			if (thinkingMode) {
+				// 明示的な思考モード：プロンプト末尾に<think>を付けているため
+				// 出力はタグなしで思考内容から始まり、</think>で区切られる
+				const thinkEnd = output.indexOf('</think>');
+				if (thinkEnd !== -1) {
+					thinkingContent = output.slice(0, thinkEnd);
+					actualOutput = output.slice(thinkEnd + '</think>'.length);
+				} else {
+					// </think>がない場合は全出力を思考内容として扱う
+					thinkingContent = output;
+					actualOutput = '';
+				}
+			} else if (output.includes('<think>')) {
+				// APIが自動で<think>...</think>を付与した場合
+				const thinkStart = output.indexOf('<think>');
+				const thinkEnd = output.indexOf('</think>');
+				if (thinkEnd !== -1 && thinkEnd > thinkStart) {
+					thinkingContent = output.slice(thinkStart + '<think>'.length, thinkEnd);
+					actualOutput = output.slice(0, thinkStart) + output.slice(thinkEnd + '</think>'.length);
+				} else {
+					// </think>がない場合は<think>以降を全て思考内容として扱う
+					thinkingContent = output.slice(thinkStart + '<think>'.length);
+					actualOutput = output.slice(0, thinkStart);
+				}
+			}
+			assistantView.setThinking(thinkingContent);
+			assistantView.setOutput(actualOutput);
+
 			const endLine = editor.document.lineCount - 1;
 			const startAt = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
 			let logRange = new vscode.Range(startAt, startAt);
-			if (writeToEditor) {
+			if (writeToEditor && actualOutput) {
 				await editor.edit(function (builder) {
-					builder.replace(startAt, output);
+					builder.replace(startAt, actualOutput);
 				}, { undoStopBefore: true, undoStopAfter: true });
-				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + output.length);
+				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + actualOutput.length);
 				logRange = new vscode.Range(startAt, endAt);
 			}
 			await saveLog(output, logRange, editor.document, parameters, input, activeDir, true);

@@ -29,7 +29,7 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			switch (data.type) {
 				case 'send':
 					{
-						this.onSend?.(data.text, data.writeToEditor ?? false);
+						this.onSend?.(data.text, data.writeToEditor ?? false, data.thinkingMode ?? false);
 					}
 			}
 		});
@@ -40,7 +40,13 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			type: 'setOutput',
 			text: text
 		});
-		return;
+	}
+
+	public setThinking(text: string): void {
+		this._view?.webview.postMessage({
+			type: 'setThinking',
+			text: text
+		});
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
@@ -64,10 +70,16 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 				<div class="option-area">
 					<input type="checkbox" id="write-to-editor">
 					<label for="write-to-editor">エディタに出力</label>
+					<input type="checkbox" id="thinking-mode" checked>
+					<label for="thinking-mode">思考モード</label>
 				</div>
 				<div class="button-area">
 					<button id="send-button">送信</button>
 				</div>
+				<details id="thinking-details">
+					<summary>思考内容</summary>
+					<textarea id="thinking" readonly="readonly"></textarea>
+				</details>
 				<h3>出力</h3>
 				<textarea id="output" readonly="readonly"></textarea>
 				<script nonce="${nonce}" src="${scriptUri}"></script>

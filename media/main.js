@@ -4,6 +4,9 @@
 	const inputElement = document.getElementById('input');
 	const outputElement = document.getElementById('output');
 	const writeToEditorElement = document.getElementById('write-to-editor');
+	const thinkingModeElement = document.getElementById('thinking-mode');
+	const thinkingElement = document.getElementById('thinking');
+	const thinkingDetailsElement = document.getElementById('thinking-details');
 
 	// 保存済みの状態を復元する
 	const state = vscode.getState();
@@ -17,6 +20,15 @@
 		if (writeToEditorElement instanceof HTMLInputElement && state.writeToEditor !== undefined) {
 			writeToEditorElement.checked = state.writeToEditor;
 		}
+		if (thinkingModeElement instanceof HTMLInputElement && state.thinkingMode !== undefined) {
+			thinkingModeElement.checked = state.thinkingMode;
+		}
+		if (thinkingElement instanceof HTMLTextAreaElement && state.thinking !== undefined) {
+			thinkingElement.value = state.thinking;
+		}
+		if (thinkingDetailsElement instanceof HTMLDetailsElement && state.thinkingOpen !== undefined) {
+			thinkingDetailsElement.open = state.thinkingOpen;
+		}
 	}
 
 	function saveState() {
@@ -24,17 +36,23 @@
 			input: inputElement instanceof HTMLTextAreaElement ? inputElement.value : '',
 			output: outputElement instanceof HTMLTextAreaElement ? outputElement.value : '',
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
+			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
+			thinking: thinkingElement instanceof HTMLTextAreaElement ? thinkingElement.value : '',
+			thinkingOpen: thinkingDetailsElement instanceof HTMLDetailsElement ? thinkingDetailsElement.open : false,
 		});
 	}
 
 	inputElement?.addEventListener('input', saveState);
 	writeToEditorElement?.addEventListener('change', saveState);
+	thinkingModeElement?.addEventListener('change', saveState);
+	thinkingDetailsElement?.addEventListener('toggle', saveState);
 
 	document.getElementById('send-button')?.addEventListener('click', function () {
 		vscode.postMessage({
 			type: 'send',
 			text: inputElement instanceof HTMLTextAreaElement ? inputElement.value : '',
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
+			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
 		});
 	});
 
@@ -45,6 +63,14 @@
 				{
 					if (outputElement instanceof HTMLTextAreaElement) {
 						outputElement.value = data.text;
+						saveState();
+					}
+					break;
+				}
+			case 'setThinking':
+				{
+					if (thinkingElement instanceof HTMLTextAreaElement) {
+						thinkingElement.value = data.text;
 						saveState();
 					}
 					break;
