@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
-import fetch from 'node-fetch';
 
-import { formatOutput, formatDate, normalizeInput } from './format';
+import { loadParameters, queryServer } from './api';
+import { writeLogFile } from './logger';
+import { AssistantViewProvider } from './assistantViewProvider';
 
-// refer: https://ai-novel.com/account_api_help.php
-
+/** AI生成テキストの1件分の履歴。リトライおよびDecoration更新に使用する。 */
 class HistoryItem {
+	/** 生成されたテキスト */
 	text: string;
+	/** ドキュメント上の挿入範囲 */
 	range: vscode.Range;
 
 	constructor (text: string, range: vscode.Range) {
@@ -38,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const continueButton = vscode.window.createStatusBarItem(
-		vscode.StatusBarAlignment.Right, 
+		vscode.StatusBarAlignment.Right,
 		0
 	);
 	continueButton.command = 'vscode-ai-novelist.getContinuation';
@@ -47,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
 	continueButton.show();
 
 	const retryButton = vscode.window.createStatusBarItem(
-		vscode.StatusBarAlignment.Right, 
+		vscode.StatusBarAlignment.Right,
 		0
 	);
 	retryButton.command = 'vscode-ai-novelist.retry';
@@ -56,166 +58,114 @@ export function activate(context: vscode.ExtensionContext) {
 	retryButton.hide();
 
 	const loadingButton = vscode.window.createStatusBarItem(
-		vscode.StatusBarAlignment.Right, 
+		vscode.StatusBarAlignment.Right,
 		0
 	);
 	loadingButton.text = 'AI接続中……';
 	context.subscriptions.push(loadingButton);
 	loadingButton.hide();
 
+	const assistantView = new AssistantViewProvider(context.extensionUri);
+	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
+		AssistantViewProvider.viewType, assistantView
+	));
+	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean) => {
+		if (lock) {
+			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
+			return;
+		}
+		const activeDir = vscode.workspace.workspaceFolders?.[0];
+		const config = vscode.workspace.getConfiguration('ai_novelist_api');
+		const apiKey = config.apiKey;
+		if (!apiKey) {
+			vscode.window.showErrorMessage('APIキーが設定されていません。');
+			return;
+		}
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			vscode.window.showErrorMessage('エディタが選択されていません。');
+			return;
+		}
+		const eol = editor.document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+		const thinkSuffix = thinkingMode ? '<think>' + eol : '';
+		const appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + userInput + eol + '[#アシスタント]' + eol + thinkSuffix;
+		const parameters = await loadParameters(config, activeDir);
+		lock = true;
+		try {
+			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, appendText);
+
+			// 思考内容と通常出力を分離する
+			let thinkingContent = '';
+			let actualOutput = output;
+			if (thinkingMode) {
+				// 明示的な思考モード：プロンプト末尾に<think>を付けているため
+				// 出力はタグなしで思考内容から始まり、</think>で区切られる
+				const thinkEnd = output.indexOf('</think>');
+				if (thinkEnd !== -1) {
+					thinkingContent = output.slice(0, thinkEnd);
+					actualOutput = output.slice(thinkEnd + '</think>'.length);
+				} else {
+					// </think>がない場合は全出力を思考内容として扱う
+					thinkingContent = output;
+					actualOutput = '';
+				}
+			} else if (output.includes('<think>')) {
+				// APIが自動で<think>...</think>を付与した場合
+				const thinkStart = output.indexOf('<think>');
+				const thinkEnd = output.indexOf('</think>');
+				if (thinkEnd !== -1 && thinkEnd > thinkStart) {
+					thinkingContent = output.slice(thinkStart + '<think>'.length, thinkEnd);
+					actualOutput = output.slice(0, thinkStart) + output.slice(thinkEnd + '</think>'.length);
+				} else {
+					// </think>がない場合は<think>以降を全て思考内容として扱う
+					thinkingContent = output.slice(thinkStart + '<think>'.length);
+					actualOutput = output.slice(0, thinkStart);
+				}
+			}
+			assistantView.setThinking(thinkingContent);
+			assistantView.setOutput(actualOutput);
+
+			const endLine = editor.document.lineCount - 1;
+			const startAt = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
+			let logRange = new vscode.Range(startAt, startAt);
+			if (writeToEditor && actualOutput) {
+				await editor.edit(function (builder) {
+					builder.replace(startAt, actualOutput);
+				}, { undoStopBefore: true, undoStopAfter: true });
+				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + actualOutput.length);
+				logRange = new vscode.Range(startAt, endAt);
+			}
+			await saveLog(output, logRange, editor.document, parameters, input, activeDir, true);
+		} catch (error) {
+			let message = '';
+			if (error instanceof Error) {
+				message = error.message;
+			} else if (typeof error === 'string') {
+				message = error;
+			}
+			vscode.window.showErrorMessage('接続エラー:' + message);
+		} finally {
+			lock = false;
+		}
+	};
+
 	const outputHistory = new Map<string, HistoryItem[]>();
 	const outputHistoryAt = new Map<string, Date>();
 
 	let lock = false;
 
-	async function loadParameters(config: vscode.WorkspaceConfiguration, activeDir: vscode.WorkspaceFolder | undefined): Promise<Object> {
-		let parameters = {...config.parameters};
-		if (activeDir) {
-			const paramJsonPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/param.json');
-			try {
-				const buf = await vscode.workspace.fs.readFile(paramJsonPath);
-				parameters = {...parameters, ...JSON.parse(buf.toString())};
-			} catch (e) {
-
-			}
-			const legacyPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist_param.json');
-			try {
-				const buf = await vscode.workspace.fs.readFile(legacyPath);
-				parameters = {...parameters, ...JSON.parse(buf.toString())};
-			} catch (e) {
-
-			}
-		}
-
-		if (parameters.badwords && Array.isArray(parameters.badwords)) {
-			parameters.badwords = parameters.badwords.join('<<|>>');
-		}
-		// logit biasがObjectなら分解する
-		if (parameters.logit_bias && typeof parameters.logit_bias === "object") {
-			parameters.logit_bias_values = parameters.logit_bias.map((value: any) => (value.token ?? '') === '' ? '' : value.bias ?? 0)
-				.filter((value: any) => value !== '')
-				.join('|');
-			parameters.logit_bias = parameters.logit_bias.map((value: any) => value.token ?? '')
-				.filter((value: any) => value !== '')
-				.join('<<|>>');
-		}
-		if (parameters.stoptokens && Array.isArray(parameters.stoptokens)) {
-			parameters.stoptokens = parameters.stoptokens.join('<<|>>');
-		}
-
-		return parameters;
-	}
-	async function queryServer(apiKey:string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined):Promise<{output: string, input: string}> {
-		let input = '';
-		if (selections) {
-			let selectedText: string[] = [];
-			// selections.sort((x, y) => { return x.start > y.start ? 1 : (x.start < y.start ? -1 : 0); });
-			for (const selection of selections) {
-				selectedText.push(document.getText(selection));
-			}
-			input = selectedText.join('\r\n');
-		} else {
-			input = document.getText();
-		}
-		if (!input) {
-			throw Error('入力文字列が空です。');
-		}
-		let memory = '';
-		let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
-		let charaBookSearchRange: number = vscode.workspace.getConfiguration('ai_novelist_api').get('chara_book_search_range') ?? 2000;
-		if (activeDir) {
-			const memoryPath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/memory.txt');
-			try {
-				const buf = await vscode.workspace.fs.readFile(memoryPath);
-				memory = buf.toString();
-			} catch (e) {
-
-			}
-
-			let noteLine = 3;
-			try {
-				const settingsBuf = await vscode.workspace.fs.readFile(
-					vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/settings.json')
-				);
-				const settings = JSON.parse(settingsBuf.toString());
-				if (typeof settings.note_line === 'number') {
-					noteLine = Math.min(20, Math.max(1, Math.floor(settings.note_line)));
-				}
-				if (typeof settings.send_limit === 'number') {
-					sendLimit = Math.max(0, Math.floor(settings.send_limit));
-				}
-				if (typeof settings.chara_book_search_range === 'number') {
-					charaBookSearchRange = Math.max(0, Math.floor(settings.chara_book_search_range));
-				}
-			} catch (e) {
-
-			}
-
-			const notePath = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/note.txt');
-			try {
-				const noteBuf = await vscode.workspace.fs.readFile(notePath);
-				const noteText = noteBuf.toString();
-				const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-				const lines = input.split(/\r?\n/);
-				const insertAt = Math.max(0, lines.length - noteLine);
-				lines.splice(insertAt, 0, noteText);
-				input = lines.join(eol);
-			} catch (e) {
-
-			}
-		}
-		const charaBookTexts: string[] = [];
-		if (activeDir) {
-			try {
-				const charaBooksDir = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/chara_books');
-				const entries = await vscode.workspace.fs.readDirectory(charaBooksDir);
-				const searchTarget = charaBookSearchRange > 0
-					? input.slice(Math.max(0, input.length - charaBookSearchRange))
-					: input;
-				const txtFiles = entries
-					.filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.txt'))
-					.map(([name]) => {
-						const hasOrder = /^\d+\./.test(name);
-						const order = hasOrder ? parseInt(name.split('.')[0]) : 100;
-						const searchKey = hasOrder
-							? name.replace(/^\d+\./, '').replace(/\.txt$/, '')
-							: name.replace(/\.txt$/, '');
-						return { name, order, searchKey };
-					})
-					.filter(f => searchTarget.includes(f.searchKey))
-					.sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name));
-				for (const file of txtFiles) {
-					try {
-						const buf = await vscode.workspace.fs.readFile(
-							vscode.Uri.joinPath(charaBooksDir, file.name)
-						);
-						charaBookTexts.push(buf.toString());
-					} catch (e) {
-
-					}
-				}
-			} catch (e) {
-
-			}
-		}
-		input = normalizeInput(input, memory, charaBookTexts, sendLimit);
-		const res = await fetch('https://api.tringpt.com/api', {
-			method: 'POST',
-			headers: {
-				// eslint-disable-next-line @typescript-eslint/naming-convention
-				'Content-Type': 'application/json',
-				// eslint-disable-next-line @typescript-eslint/naming-convention
-				'Authorization': 'Bearer ' + apiKey
-			},
-			body: JSON.stringify({
-				'text': input,
-				...parameters,
-			})
-		});
-		const body = Object(await res.json());
-		return { output: formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF), input };
-	}
-	async function saveLog(currentText: string, range:vscode.Range, activeDocument: vscode.TextDocument, parameters: object, input: string, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
+	/**
+	 * AI出力を `outputHistory` / `outputHistoryAt` に記録し、ログファイルへの書き出しを行う。
+	 *
+	 * @param currentText 生成されたテキスト
+	 * @param range ドキュメント上の挿入範囲
+	 * @param activeDocument 対象ドキュメント
+	 * @param parameters APIに渡したパラメータオブジェクト
+	 * @param input APIに実際に送信したテキスト
+	 * @param activeDir ログ保存先となるワークスペースフォルダ（undefined の場合はファイル保存をスキップ）
+	 * @param renewLogFile true の場合はログファイル名を新規発行する（続きを書くコマンド用）
+	 */
+	async function saveLog(currentText: string, range: vscode.Range, activeDocument: vscode.TextDocument, parameters: object, input: string, activeDir: vscode.WorkspaceFolder | undefined = undefined, renewLogFile = false) {
 		const uri = activeDocument.uri.toString();
 		let lastGenerated: Date;
 		if (outputHistory.has(uri)) {
@@ -237,28 +187,12 @@ export function activate(context: vscode.ExtensionContext) {
 			lastGenerated = new Date();
 			outputHistoryAt.set(uri, lastGenerated);
 		}
-		
-		if (activeDir) {
-			// 設定がログを保存するようになっているか確認
-			const config = vscode.workspace.getConfiguration('ai_novelist_api');
-			if (!config) {
-				return;
-			}
-			let saveOutputToLogFile = config.saveOutputToLogFile;
-			if (saveOutputToLogFile === undefined) {
-				saveOutputToLogFile = true;
-			}
-			if (!saveOutputToLogFile) {
-				return;
-			}
-			// ファイルに保存
-			const dateString = formatDate(lastGenerated);
 
-			const path = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/history/' + dateString + '.json');
-			const logContent = JSON.stringify({ output: currentText, params: { text: input, ...parameters } }, null, 2);
-			vscode.workspace.fs.writeFile(path, new TextEncoder().encode(logContent));
+		if (activeDir) {
+			await writeLogFile(activeDir, lastGenerated, currentText, parameters, input);
 		}
 	}
+
 	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuation', async () => {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
@@ -357,7 +291,7 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage('履歴がないのでリトライできません。');
 				return;
 			}
-			
+
 			let isDelete = false;
 			for (const output of last) {
 				if (document.getText(output.range) === output.text) {
@@ -402,6 +336,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let activeEditor = vscode.window.activeTextEditor;
 
+	/**
+	 * アクティブエディタの `outputHistory` を参照し、最新の有効な出力範囲に青枠Decorationを適用する。
+	 * 出力テキストが変更済み・削除済みの場合は Decoration を外す。
+	 */
 	function updateDecorations() {
 		if (!activeEditor) {
 			return;
@@ -414,7 +352,7 @@ export function activate(context: vscode.ExtensionContext) {
 		if (!last || last.length === 0) {
 			return;
 		}
-		
+
 		const decoratedOutput: vscode.DecorationOptions[] = [];
 		for (const output of last) {
 			if (document.getText(output.range).replace(/\r\n/g, '\n').trimEnd() === output.text.replace(/\r\n/g, '\n').trimEnd()) {
@@ -426,6 +364,12 @@ export function activate(context: vscode.ExtensionContext) {
 		activeEditor.setDecorations(outputDecorationType, decoratedOutput);
 	}
 
+	/**
+	 * `updateDecorations` の呼び出しをスロットル制御する。
+	 * テキスト変更イベントなど高頻度で発火する場合は throttle=true を指定する。
+	 *
+	 * @param throttle true の場合は 300ms のデバウンスを挟む
+	 */
 	function triggerUpdateDecorations(throttle = false) {
 		if (timeout) {
 			clearTimeout(timeout);
