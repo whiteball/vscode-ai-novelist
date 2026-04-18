@@ -171,7 +171,7 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		} finally {
 			// noteが存在しないなら、{__note__}の除去だけ行う
 			if (appendText !== undefined) {
-				appendText = appendText.replace('/\{__note__\}(\r?\n)?/', '');
+				appendText = appendText.replace(/\{__note__\}(\r?\n)?/gm, '');
 			}
 		}
 	}
