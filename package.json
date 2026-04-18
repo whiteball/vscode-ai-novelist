@@ -92,9 +92,9 @@
         "ai_novelist_api.parameters.length": {
           "order": 101,
           "type": "integer",
-          "description": "出力トークン数の長さ(1～300)\n出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります。",
+          "description": "出力トークン数の長さ(1～400)\n出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります。",
           "default": 30,
-          "maximum": 300,
+          "maximum": 400,
           "minimum": 1
         },
         "ai_novelist_api.parameters.temperature": {

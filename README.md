@@ -32,7 +32,7 @@ AIのべりすとのユーザー登録と、そのユーザーに使用可能な
 
 * `ai_novelist_api.apiKey`: AIのべりすとの開発者向けAPIページのAPIキーを設定してください。設定しないとAPIは利用できません。
 * `ai_novelist_api.saveOutputToLogFile`: この設定が有効の場合、AIの出力をログファイル(`.ai_novelist/history/yyyymmdd_hhMMss.json`)に保存します。パラメータと送信テキスト全文も記録されます。
-* `ai_novelist_api.parameters.length`: 出力トークン数の長さ(1～300)。出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります
+* `ai_novelist_api.parameters.length`: 出力トークン数の長さ(1～400)。出力に時間がかかる場合、この長さにかかわらず出力が短くなる場合があります
 * `ai_novelist_api.parameters.temperature`: ランダム度(0～2.5)。語彙が単調に感じる場合は上げてみてください。上げすぎると支離滅裂な出力なります。
 * `ai_novelist_api.parameters.top_p`: Top Pサンプリング(0.01～1.0)。低いほど出現確率の低いトークンが除外されます。極端に関係のない語彙が出ることを防ぎます。
 * `ai_novelist_api.parameters.rep_pen`: 繰り返しペナルティ(1.0～2.0)。同じトークンが出力されにくさの度合いを指定します。数字を大きくすると、同じトークンが出力されにくくなります。値が高すぎると出力が突飛になりすぎる可能性があります。
