@@ -213,6 +213,14 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		input += appendText;
 	}
 	input = normalizeInput(input, memory, charaBookTexts, sendLimit);
+	const sendParams = { ...(parameters as Record<string, unknown>) };
+	if (assistantOptions?.thinkingMode) {
+		const lengthThink = sendParams.length_think;
+		if (typeof lengthThink === 'number' && lengthThink > 0) {
+			sendParams.length = lengthThink;
+		}
+	}
+	delete sendParams.length_think;
 	const res = await fetch('https://api.tringpt.com/api', {
 		method: 'POST',
 		headers: {
@@ -223,7 +231,7 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		},
 		body: JSON.stringify({
 			'text': input,
-			...parameters,
+			...sendParams,
 		})
 	});
 	const body = Object(await res.json());

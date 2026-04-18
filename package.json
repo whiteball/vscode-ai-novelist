@@ -215,6 +215,14 @@
           "enum": ["supertrin", "damsel"],
           "enumDescriptions": ["スーパーとりんさまモデル", "やみおとめモデル"],
           "description": "使用するモデルを選択できます。"
+        },
+        "ai_novelist_api.parameters.length_think": {
+          "order": 116,
+          "type": "integer",
+          "description": "思考モードON時の出力トークン数の長さ(1～400)。0の場合はlengthの値をそのまま使用します。",
+          "default": 0,
+          "maximum": 400,
+          "minimum": 0
         }
       }
     }
