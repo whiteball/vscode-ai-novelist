@@ -6,8 +6,10 @@
 	const writeToEditorElement = document.getElementById('write-to-editor');
 	const thinkingModeElement = document.getElementById('thinking-mode');
 	const useSelectionOnlyElement = document.getElementById('use-selection-only');
+	const autoContinueThinkElement = document.getElementById('auto-continue-think');
 	const thinkingElement = document.getElementById('thinking');
 	const thinkingDetailsElement = document.getElementById('thinking-details');
+	const optionDetailsElement = document.getElementById('option-details');
 
 	// 保存済みの状態を復元する
 	const state = vscode.getState();
@@ -27,11 +29,17 @@
 		if (useSelectionOnlyElement instanceof HTMLInputElement && state.useSelectionOnly !== undefined) {
 			useSelectionOnlyElement.checked = state.useSelectionOnly;
 		}
+		if (autoContinueThinkElement instanceof HTMLInputElement && state.autoContinueThink !== undefined) {
+			autoContinueThinkElement.checked = state.autoContinueThink;
+		}
 		if (thinkingElement instanceof HTMLTextAreaElement && state.thinking !== undefined) {
 			thinkingElement.value = state.thinking;
 		}
 		if (thinkingDetailsElement instanceof HTMLDetailsElement && state.thinkingOpen !== undefined) {
 			thinkingDetailsElement.open = state.thinkingOpen;
+		}
+		if (optionDetailsElement instanceof HTMLDetailsElement && state.optionOpen !== undefined) {
+			optionDetailsElement.open = state.optionOpen;
 		}
 	}
 
@@ -42,8 +50,10 @@
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
 			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
 			useSelectionOnly: useSelectionOnlyElement instanceof HTMLInputElement ? useSelectionOnlyElement.checked : false,
+			autoContinueThink: autoContinueThinkElement instanceof HTMLInputElement ? autoContinueThinkElement.checked : false,
 			thinking: thinkingElement instanceof HTMLTextAreaElement ? thinkingElement.value : '',
 			thinkingOpen: thinkingDetailsElement instanceof HTMLDetailsElement ? thinkingDetailsElement.open : false,
+			optionOpen: optionDetailsElement instanceof HTMLDetailsElement ? optionDetailsElement.open : false,
 		});
 	}
 
@@ -51,7 +61,9 @@
 	writeToEditorElement?.addEventListener('change', saveState);
 	thinkingModeElement?.addEventListener('change', saveState);
 	useSelectionOnlyElement?.addEventListener('change', saveState);
+	autoContinueThinkElement?.addEventListener('change', saveState);
 	thinkingDetailsElement?.addEventListener('toggle', saveState);
+	optionDetailsElement?.addEventListener('toggle', saveState);
 
 	document.getElementById('send-button')?.addEventListener('click', function () {
 		vscode.postMessage({
@@ -60,6 +72,7 @@
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
 			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
 			useSelectionOnly: useSelectionOnlyElement instanceof HTMLInputElement ? useSelectionOnlyElement.checked : false,
+			autoContinueThink: autoContinueThinkElement instanceof HTMLInputElement ? autoContinueThinkElement.checked : false,
 		});
 	});
 

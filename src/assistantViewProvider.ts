@@ -29,7 +29,7 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			switch (data.type) {
 				case 'send':
 					{
-						this.onSend?.(data.text, data.writeToEditor ?? false, data.thinkingMode ?? false, data.useSelectionOnly ?? false);
+						this.onSend?.(data.text, data.writeToEditor ?? false, data.thinkingMode ?? false, data.useSelectionOnly ?? false, data.autoContinueThink ?? false);
 					}
 			}
 		});
@@ -67,14 +67,19 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			<body>
 				<h3>指示</h3>
 				<textarea id="input"></textarea><br>
-				<div class="option-area">
-					<input type="checkbox" id="write-to-editor">
-					<label for="write-to-editor">エディタに出力</label>
-					<input type="checkbox" id="thinking-mode" checked>
-					<label for="thinking-mode">思考モード</label>
-					<input type="checkbox" id="use-selection-only">
-					<label for="use-selection-only">選択中はそのテキストのみ</label>
-				</div>
+				<details id="option-details">
+					<summary>設定</summary>
+					<div class="option-area">
+						<input type="checkbox" id="write-to-editor">
+						<label for="write-to-editor">エディタに出力</label><br>
+						<input type="checkbox" id="thinking-mode" checked>
+						<label for="thinking-mode">思考モード</label><br>
+						<input type="checkbox" id="use-selection-only">
+						<label for="use-selection-only">選択中はそのテキストのみ</label><br>
+						<input type="checkbox" id="auto-continue-think">
+						<label for="auto-continue-think">思考のみの場合自動で続きを書く</label>
+					</div>
+				</details>
 				<div class="button-area">
 					<button id="send-button">送信</button>
 				</div>

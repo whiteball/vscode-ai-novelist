@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
 		AssistantViewProvider.viewType, assistantView
 	));
-	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean, useSelectionOnly: boolean) => {
+	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean, useSelectionOnly: boolean, autoContinueThink: boolean) => {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
 			return;
@@ -99,7 +99,7 @@ export function activate(context: vscode.ExtensionContext) {
 					assistantSelections = nonEmpty;
 				}
 			}
-			const { output, input, think, rawOutput } = await queryServer(config.apiKey, editor.document, parameters, activeDir, assistantSelections, { userInput, thinkingMode });
+			const { output, input, think, rawOutput } = await queryServer(config.apiKey, editor.document, parameters, activeDir, assistantSelections, { userInput, thinkingMode, autoContinueThink });
 
 			assistantView.setThinking(think);
 			assistantView.setOutput(output);

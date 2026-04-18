@@ -61,10 +61,10 @@ export async function loadParameters(config: vscode.WorkspaceConfiguration, acti
  * @param parameters APIパラメータ（`loadParameters` で構築したもの）
  * @param activeDir アクティブなワークスペースフォルダ（undefined の場合は補助ファイルの読み込みをスキップ）
  * @param selections 選択範囲（undefined の場合はドキュメント全体を送信）
- * @param assistantOptions アシスタントビュー用オプション。指定時は `instruct_template.txt` / `think_template.txt` を読み込んで `appendText` を構築する
+ * @param assistantOptions アシスタントビュー用オプション。指定時は `instruct_template.txt` / `think_template.txt` を読み込んで `appendText` を構築する。`autoContinueThink` が true の場合、`</think>` がない出力に対して自動で続きを要求する
  * @returns `output`（思考内容を除いたAI出力）、`input`（実際に送信したテキスト）、`think`（思考内容）、`rawOutput`（APIの生出力）のオブジェクト
  */
-export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, assistantOptions?: { userInput: string; thinkingMode: boolean }): Promise<{output: string, input: string, think: string, rawOutput: string}> {
+export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, assistantOptions?: { userInput: string; thinkingMode: boolean; autoContinueThink?: boolean }): Promise<{output: string, input: string, think: string, rawOutput: string}> {
 	let input = '';
 	if (selections) {
 		let selectedText: string[] = [];
@@ -221,21 +221,32 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		}
 	}
 	delete sendParams.length_think;
-	const res = await fetch('https://api.tringpt.com/api', {
-		method: 'POST',
-		headers: {
-			// eslint-disable-next-line @typescript-eslint/naming-convention
-			'Content-Type': 'application/json',
-			// eslint-disable-next-line @typescript-eslint/naming-convention
-			'Authorization': 'Bearer ' + apiKey
-		},
-		body: JSON.stringify({
-			'text': input,
-			...sendParams,
-		})
-	});
-	const body = Object(await res.json());
-	const rawOutput = formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF);
+	const autoContinue = assistantOptions?.thinkingMode && assistantOptions?.autoContinueThink;
+	const maxIterations = autoContinue ? 5 : 1;
+	let sendText = input;
+	let combinedRaw = '';
+	for (let i = 0; i < maxIterations; i++) {
+		const res = await fetch('https://api.tringpt.com/api', {
+			method: 'POST',
+			headers: {
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				'Content-Type': 'application/json',
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				'Authorization': 'Bearer ' + apiKey
+			},
+			body: JSON.stringify({
+				'text': sendText,
+				...sendParams,
+			})
+		});
+		const body = Object(await res.json());
+		combinedRaw += body.data[0];
+		if (!autoContinue || combinedRaw.includes('</think>')) {
+			break;
+		}
+		sendText = input + combinedRaw;
+	}
+	const rawOutput = formatOutput(combinedRaw, input, document.eol === vscode.EndOfLine.LF);
 	const thinkingMode = assistantOptions?.thinkingMode ?? false;
 
 	let think = '';
