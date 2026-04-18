@@ -61,10 +61,10 @@ export async function loadParameters(config: vscode.WorkspaceConfiguration, acti
  * @param parameters APIパラメータ（`loadParameters` で構築したもの）
  * @param activeDir アクティブなワークスペースフォルダ（undefined の場合は補助ファイルの読み込みをスキップ）
  * @param selections 選択範囲（undefined の場合はドキュメント全体を送信）
- * @param appendText ドキュメントテキストの末尾に追記する文字列（メモリー・脚注・正規化の前に結合される）
+ * @param assistantOptions アシスタントビュー用オプション。指定時は `instruct_template.txt` / `think_template.txt` を読み込んで `appendText` を構築する
  * @returns `output`（AI出力テキスト）と `input`（実際に送信したテキスト）のペア
  */
-export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, appendText: string | undefined = undefined): Promise<{output: string, input: string}> {
+export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, assistantOptions?: { userInput: string; thinkingMode: boolean }): Promise<{output: string, input: string}> {
 	let input = '';
 	if (selections) {
 		let selectedText: string[] = [];
@@ -78,6 +78,44 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 	if (!input) {
 		throw Error('入力文字列が空です。');
 	}
+
+	// assistantOptionsからappendTextを構築する
+	let appendText: string | undefined = undefined;
+	if (assistantOptions) {
+		const eol = document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
+		appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + '{__input__}' + eol + '[#アシスタント]' + eol + '{__think__}';
+		if (activeDir) {
+			try {
+				const templateBuf = await vscode.workspace.fs.readFile(
+					vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/instruct_template.txt')
+				);
+				appendText = eol + templateBuf.toString();
+			} catch (e) {
+
+			}
+		}
+		if (appendText.includes('{__input__}')) {
+			appendText = appendText.replace('{__input__}', assistantOptions.userInput);
+		}
+		if (appendText.includes('{__think__}')) {
+			let thinkText = '';
+			if (assistantOptions.thinkingMode) {
+				thinkText = '<think>' + eol;
+				if (activeDir) {
+					try {
+						const thinkBuf = await vscode.workspace.fs.readFile(
+							vscode.Uri.joinPath(activeDir.uri, '.ai_novelist/think_template.txt')
+						);
+						thinkText = thinkBuf.toString();
+					} catch (e) {
+
+					}
+				}
+			}
+			appendText = appendText.replace('{__think__}', thinkText);
+		}
+	}
+
 	let memory = '';
 	let sendLimit: number = vscode.workspace.getConfiguration('ai_novelist_api').get('send_limit') ?? 0;
 	let charaBookSearchRange: number = vscode.workspace.getConfiguration('ai_novelist_api').get('chara_book_search_range') ?? 2000;

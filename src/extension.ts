@@ -86,13 +86,10 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage('エディタが選択されていません。');
 			return;
 		}
-		const eol = editor.document.eol === vscode.EndOfLine.LF ? '\n' : '\r\n';
-		const thinkSuffix = thinkingMode ? '<think>' + eol : '';
-		const appendText = eol + '[#ユーザー]' + eol + '{__note__}' + eol + userInput + eol + '[#アシスタント]' + eol + thinkSuffix;
 		const parameters = await loadParameters(config, activeDir);
 		lock = true;
 		try {
-			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, appendText);
+			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, { userInput, thinkingMode });
 
 			// 思考内容と通常出力を分離する
 			let thinkingContent = '';
