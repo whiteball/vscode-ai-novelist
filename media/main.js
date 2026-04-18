@@ -5,6 +5,7 @@
 	const outputElement = document.getElementById('output');
 	const writeToEditorElement = document.getElementById('write-to-editor');
 	const thinkingModeElement = document.getElementById('thinking-mode');
+	const useSelectionOnlyElement = document.getElementById('use-selection-only');
 	const thinkingElement = document.getElementById('thinking');
 	const thinkingDetailsElement = document.getElementById('thinking-details');
 
@@ -23,6 +24,9 @@
 		if (thinkingModeElement instanceof HTMLInputElement && state.thinkingMode !== undefined) {
 			thinkingModeElement.checked = state.thinkingMode;
 		}
+		if (useSelectionOnlyElement instanceof HTMLInputElement && state.useSelectionOnly !== undefined) {
+			useSelectionOnlyElement.checked = state.useSelectionOnly;
+		}
 		if (thinkingElement instanceof HTMLTextAreaElement && state.thinking !== undefined) {
 			thinkingElement.value = state.thinking;
 		}
@@ -37,6 +41,7 @@
 			output: outputElement instanceof HTMLTextAreaElement ? outputElement.value : '',
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
 			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
+			useSelectionOnly: useSelectionOnlyElement instanceof HTMLInputElement ? useSelectionOnlyElement.checked : false,
 			thinking: thinkingElement instanceof HTMLTextAreaElement ? thinkingElement.value : '',
 			thinkingOpen: thinkingDetailsElement instanceof HTMLDetailsElement ? thinkingDetailsElement.open : false,
 		});
@@ -45,6 +50,7 @@
 	inputElement?.addEventListener('input', saveState);
 	writeToEditorElement?.addEventListener('change', saveState);
 	thinkingModeElement?.addEventListener('change', saveState);
+	useSelectionOnlyElement?.addEventListener('change', saveState);
 	thinkingDetailsElement?.addEventListener('toggle', saveState);
 
 	document.getElementById('send-button')?.addEventListener('click', function () {
@@ -53,6 +59,7 @@
 			text: inputElement instanceof HTMLTextAreaElement ? inputElement.value : '',
 			writeToEditor: writeToEditorElement instanceof HTMLInputElement ? writeToEditorElement.checked : false,
 			thinkingMode: thinkingModeElement instanceof HTMLInputElement ? thinkingModeElement.checked : true,
+			useSelectionOnly: useSelectionOnlyElement instanceof HTMLInputElement ? useSelectionOnlyElement.checked : false,
 		});
 	});
 

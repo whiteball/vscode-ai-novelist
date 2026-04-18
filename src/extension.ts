@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(
 		AssistantViewProvider.viewType, assistantView
 	));
-	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean) => {
+	assistantView.onSend = async (userInput: string, writeToEditor: boolean, thinkingMode: boolean, useSelectionOnly: boolean) => {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
 			return;
@@ -89,7 +89,14 @@ export function activate(context: vscode.ExtensionContext) {
 		const parameters = await loadParameters(config, activeDir);
 		lock = true;
 		try {
-			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, undefined, { userInput, thinkingMode });
+			let assistantSelections: vscode.Selection[] | undefined = undefined;
+			if (useSelectionOnly) {
+				const nonEmpty = editor.selections.filter(s => !s.isEmpty);
+				if (nonEmpty.length > 0) {
+					assistantSelections = nonEmpty;
+				}
+			}
+			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, assistantSelections, { userInput, thinkingMode });
 
 			// 思考内容と通常出力を分離する
 			let thinkingContent = '';
@@ -315,6 +322,75 @@ export function activate(context: vscode.ExtensionContext) {
 			// 履歴に追加
 			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
 			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, input, activeDir);
+			retryButton.show();
+		} catch (error) {
+			let message = '';
+			if (error instanceof Error) {
+				message = error.message;
+			} else if (typeof error === 'string') {
+				message = error;
+			}
+			vscode.window.showErrorMessage('接続エラー:' + message);
+		} finally {
+			loadingButton.hide();
+			continueButton.show();
+			lock = false;
+		}
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuationFromSelection', async () => {
+		if (lock) {
+			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
+			return;
+		}
+
+		const activeDir = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : undefined;
+
+		const config = vscode.workspace.getConfiguration('ai_novelist_api');
+		if (!config) {
+			return;
+		}
+		const apiKey = config.apiKey;
+		if (!apiKey) {
+			return;
+		}
+
+		continueButton.hide();
+		retryButton.hide();
+		loadingButton.show();
+		lock = true;
+
+		const parameters = await loadParameters(config, activeDir);
+		try {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor) {
+				vscode.window.showErrorMessage('エディタが選択されていません。');
+				return;
+			}
+			const document = editor.document;
+			if (!document) {
+				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
+				return;
+			}
+
+			const selections = editor.selections.filter(s => !s.isEmpty);
+			if (selections.length === 0) {
+				vscode.window.showErrorMessage('テキストが選択されていません。');
+				return;
+			}
+
+			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir, selections);
+
+			const lastEnd = selections.reduce((latest, s) =>
+				s.end.isAfter(latest) ? s.end : latest,
+				selections[0].end
+			);
+			await editor.edit(function (builder) {
+				builder.replace(lastEnd, currentText);
+			}, { undoStopBefore: true, undoStopAfter: true });
+
+			const endAt = document.positionAt(document.offsetAt(lastEnd) + currentText.length);
+			await saveLog(currentText, new vscode.Range(lastEnd, endAt), document, parameters, input, activeDir, true);
 			retryButton.show();
 		} catch (error) {
 			let message = '';

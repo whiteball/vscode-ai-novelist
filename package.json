@@ -45,8 +45,21 @@
       {
         "command": "vscode-ai-novelist.getContinuation",
         "title": "続きを書く(AIのべりすと)"
+      },
+      {
+        "command": "vscode-ai-novelist.getContinuationFromSelection",
+        "title": "選択範囲の続きを書く(AIのべりすと)"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "vscode-ai-novelist.getContinuationFromSelection",
+          "when": "editorHasSelection",
+          "group": "1_modification"
+        }
+      ]
+    },
     "configuration": {
       "title": "AIのべりすとAPI",
       "properties": {

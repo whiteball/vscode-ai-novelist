@@ -29,7 +29,7 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 			switch (data.type) {
 				case 'send':
 					{
-						this.onSend?.(data.text, data.writeToEditor ?? false, data.thinkingMode ?? false);
+						this.onSend?.(data.text, data.writeToEditor ?? false, data.thinkingMode ?? false, data.useSelectionOnly ?? false);
 					}
 			}
 		});
@@ -72,6 +72,8 @@ export class AssistantViewProvider implements vscode.WebviewViewProvider {
 					<label for="write-to-editor">エディタに出力</label>
 					<input type="checkbox" id="thinking-mode" checked>
 					<label for="thinking-mode">思考モード</label>
+					<input type="checkbox" id="use-selection-only">
+					<label for="use-selection-only">選択中はそのテキストのみ</label>
 				</div>
 				<div class="button-area">
 					<button id="send-button">送信</button>
