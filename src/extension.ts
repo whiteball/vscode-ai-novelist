@@ -87,6 +87,9 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		const parameters = await loadParameters(config, activeDir);
+		continueButton.hide();
+		retryButton.hide();
+		loadingButton.show();
 		lock = true;
 		try {
 			let assistantSelections: vscode.Selection[] | undefined = undefined;
@@ -149,6 +152,8 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			vscode.window.showErrorMessage('接続エラー:' + message);
 		} finally {
+			loadingButton.hide();
+			continueButton.show();
 			lock = false;
 		}
 	};
