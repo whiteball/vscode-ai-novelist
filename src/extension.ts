@@ -174,7 +174,22 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}
 
-	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuation', async () => {
+	/**
+	 * APIコマンドの共通処理（lock・ステータスバー表示・エディタ検証・エラーハンドリング）をまとめて実行する。
+	 *
+	 * @param hideRetryOnStart 開始時に `retryButton` を非表示にするかどうか（retry コマンド時は false）
+	 * @param body APIコール本体。`queryServer` 呼び出しと結果の反映を行う
+	 */
+	async function executeApiCommand(
+		hideRetryOnStart: boolean,
+		body: (ctx: {
+			editor: vscode.TextEditor;
+			document: vscode.TextDocument;
+			apiKey: string;
+			parameters: object;
+			activeDir: vscode.WorkspaceFolder | undefined;
+		}) => Promise<void>
+	): Promise<void> {
 		if (lock) {
 			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
 			return;
@@ -192,7 +207,9 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		continueButton.hide();
-		retryButton.hide();
+		if (hideRetryOnStart) {
+			retryButton.hide();
+		}
 		loadingButton.show();
 		lock = true;
 
@@ -208,18 +225,7 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
 				return;
 			}
-			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir);
-
-			const line = document.lineCount;
-			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
-			await editor.edit(function (builder) {
-				builder.replace(startAt, currentText);
-			}, { undoStopBefore: true, undoStopAfter: true });
-
-			// 履歴に追加
-			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, input, activeDir, true);
-			retryButton.show();
+			await body({ editor, document, apiKey, parameters, activeDir });
 		} catch (error) {
 			let message = '';
 			if (error instanceof Error) {
@@ -233,40 +239,44 @@ export function activate(context: vscode.ExtensionContext) {
 			continueButton.show();
 			lock = false;
 		}
-	}));
-	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.retry', async () => {
-		if (lock) {
-			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
-			return;
-		}
+	}
 
-		const activeDir = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : undefined;
+	/**
+	 * AIの出力を指定位置に挿入し、履歴とログに記録する。
+	 *
+	 * @param undoStopBefore editor.edit の undoStopBefore（retry 時は直前の削除と連結するため false）
+	 * @param renewLogFile saveLog のログファイル名を新規発行するかどうか（retry 時は false）
+	 */
+	async function insertOutputAndSaveLog(
+		editor: vscode.TextEditor,
+		document: vscode.TextDocument,
+		position: vscode.Position,
+		currentText: string,
+		parameters: object,
+		input: string,
+		activeDir: vscode.WorkspaceFolder | undefined,
+		undoStopBefore: boolean,
+		renewLogFile: boolean
+	): Promise<void> {
+		await editor.edit(function (builder) {
+			builder.replace(position, currentText);
+		}, { undoStopBefore, undoStopAfter: true });
+		const endAt = document.positionAt(document.offsetAt(position) + currentText.length);
+		await saveLog(currentText, new vscode.Range(position, endAt), document, parameters, input, activeDir, renewLogFile);
+	}
 
-		const config = vscode.workspace.getConfiguration('ai_novelist_api');
-		if (!config) {
-			return;
-		}
-		const apiKey = config.apiKey;
-		if (!apiKey) {
-			return;
-		}
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuation', () =>
+		executeApiCommand(true, async ({ editor, document, apiKey, parameters, activeDir }) => {
+			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir);
+			const line = document.lineCount;
+			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
+			await insertOutputAndSaveLog(editor, document, startAt, currentText, parameters, input, activeDir, true, true);
+			retryButton.show();
+		})
+	));
 
-		continueButton.hide();
-		loadingButton.show();
-		lock = true;
-
-		const parameters = await loadParameters(config, activeDir);
-		try {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor) {
-				vscode.window.showErrorMessage('エディタが選択されていません。');
-				return;
-			}
-			const document = editor.document;
-			if (!document) {
-				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
-				return;
-			}
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.retry', () =>
+		executeApiCommand(false, async ({ editor, document, apiKey, parameters, activeDir }) => {
 			const last = outputHistory.get(document.uri.toString());
 			if (!last || last.length === 0) {
 				vscode.window.showErrorMessage('履歴がないのでリトライできません。');
@@ -289,100 +299,29 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir);
-
 			const line = document.lineCount;
 			const startAt = new vscode.Position(line - 1, document.lineAt(line - 1).text.length);
-			await editor.edit(function (builder) {
-				builder.replace(startAt, currentText);
-			}, { undoStopBefore: false, undoStopAfter: true });
-
-			// 履歴に追加
-			const endAt = document.positionAt(document.offsetAt(startAt) + currentText.length);
-			await saveLog(currentText, new vscode.Range(startAt, endAt), document, parameters, input, activeDir);
+			await insertOutputAndSaveLog(editor, document, startAt, currentText, parameters, input, activeDir, false, false);
 			retryButton.show();
-		} catch (error) {
-			let message = '';
-			if (error instanceof Error) {
-				message = error.message;
-			} else if (typeof error === 'string') {
-				message = error;
-			}
-			vscode.window.showErrorMessage('接続エラー:' + message);
-		} finally {
-			loadingButton.hide();
-			continueButton.show();
-			lock = false;
-		}
-	}));
+		})
+	));
 
-	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuationFromSelection', async () => {
-		if (lock) {
-			vscode.window.showInformationMessage('現在AIに問い合わせ中です。');
-			return;
-		}
-
-		const activeDir = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : undefined;
-
-		const config = vscode.workspace.getConfiguration('ai_novelist_api');
-		if (!config) {
-			return;
-		}
-		const apiKey = config.apiKey;
-		if (!apiKey) {
-			return;
-		}
-
-		continueButton.hide();
-		retryButton.hide();
-		loadingButton.show();
-		lock = true;
-
-		const parameters = await loadParameters(config, activeDir);
-		try {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor) {
-				vscode.window.showErrorMessage('エディタが選択されていません。');
-				return;
-			}
-			const document = editor.document;
-			if (!document) {
-				vscode.window.showErrorMessage('ドキュメントが開かれていません。');
-				return;
-			}
-
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuationFromSelection', () =>
+		executeApiCommand(true, async ({ editor, document, apiKey, parameters, activeDir }) => {
 			const selections = editor.selections.filter(s => !s.isEmpty);
 			if (selections.length === 0) {
 				vscode.window.showErrorMessage('テキストが選択されていません。');
 				return;
 			}
-
 			const { output: currentText, input } = await queryServer(apiKey, document, parameters, activeDir, selections);
-
 			const lastEnd = selections.reduce((latest, s) =>
 				s.end.isAfter(latest) ? s.end : latest,
 				selections[0].end
 			);
-			await editor.edit(function (builder) {
-				builder.replace(lastEnd, currentText);
-			}, { undoStopBefore: true, undoStopAfter: true });
-
-			const endAt = document.positionAt(document.offsetAt(lastEnd) + currentText.length);
-			await saveLog(currentText, new vscode.Range(lastEnd, endAt), document, parameters, input, activeDir, true);
+			await insertOutputAndSaveLog(editor, document, lastEnd, currentText, parameters, input, activeDir, true, true);
 			retryButton.show();
-		} catch (error) {
-			let message = '';
-			if (error instanceof Error) {
-				message = error.message;
-			} else if (typeof error === 'string') {
-				message = error;
-			}
-			vscode.window.showErrorMessage('接続エラー:' + message);
-		} finally {
-			loadingButton.hide();
-			continueButton.show();
-			lock = false;
-		}
-	}));
+		})
+	));
 
 	let activeEditor = vscode.window.activeTextEditor;
 
