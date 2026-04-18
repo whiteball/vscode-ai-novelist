@@ -99,50 +99,22 @@ export function activate(context: vscode.ExtensionContext) {
 					assistantSelections = nonEmpty;
 				}
 			}
-			const { output, input } = await queryServer(config.apiKey, editor.document, parameters, activeDir, assistantSelections, { userInput, thinkingMode });
+			const { output, input, think, rawOutput } = await queryServer(config.apiKey, editor.document, parameters, activeDir, assistantSelections, { userInput, thinkingMode });
 
-			// 思考内容と通常出力を分離する
-			let thinkingContent = '';
-			let actualOutput = output;
-			if (thinkingMode) {
-				// 明示的な思考モード：プロンプト末尾に<think>を付けているため
-				// 出力はタグなしで思考内容から始まり、</think>で区切られる
-				const thinkEnd = output.indexOf('</think>');
-				if (thinkEnd !== -1) {
-					thinkingContent = output.slice(0, thinkEnd);
-					actualOutput = output.slice(thinkEnd + '</think>'.length);
-				} else {
-					// </think>がない場合は全出力を思考内容として扱う
-					thinkingContent = output;
-					actualOutput = '';
-				}
-			} else if (output.includes('<think>')) {
-				// APIが自動で<think>...</think>を付与した場合
-				const thinkStart = output.indexOf('<think>');
-				const thinkEnd = output.indexOf('</think>');
-				if (thinkEnd !== -1 && thinkEnd > thinkStart) {
-					thinkingContent = output.slice(thinkStart + '<think>'.length, thinkEnd);
-					actualOutput = output.slice(0, thinkStart) + output.slice(thinkEnd + '</think>'.length);
-				} else {
-					// </think>がない場合は<think>以降を全て思考内容として扱う
-					thinkingContent = output.slice(thinkStart + '<think>'.length);
-					actualOutput = output.slice(0, thinkStart);
-				}
-			}
-			assistantView.setThinking(thinkingContent);
-			assistantView.setOutput(actualOutput);
+			assistantView.setThinking(think);
+			assistantView.setOutput(output);
 
 			const endLine = editor.document.lineCount - 1;
 			const startAt = new vscode.Position(endLine, editor.document.lineAt(endLine).text.length);
 			let logRange = new vscode.Range(startAt, startAt);
-			if (writeToEditor && actualOutput) {
+			if (writeToEditor && output) {
 				await editor.edit(function (builder) {
-					builder.replace(startAt, actualOutput);
+					builder.replace(startAt, output);
 				}, { undoStopBefore: true, undoStopAfter: true });
-				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + actualOutput.length);
+				const endAt = editor.document.positionAt(editor.document.offsetAt(startAt) + output.length);
 				logRange = new vscode.Range(startAt, endAt);
 			}
-			await saveLog(output, logRange, editor.document, parameters, input, activeDir, true);
+			await saveLog(rawOutput, logRange, editor.document, parameters, input, activeDir, true);
 		} catch (error) {
 			let message = '';
 			if (error instanceof Error) {

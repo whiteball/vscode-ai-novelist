@@ -62,9 +62,9 @@ export async function loadParameters(config: vscode.WorkspaceConfiguration, acti
  * @param activeDir アクティブなワークスペースフォルダ（undefined の場合は補助ファイルの読み込みをスキップ）
  * @param selections 選択範囲（undefined の場合はドキュメント全体を送信）
  * @param assistantOptions アシスタントビュー用オプション。指定時は `instruct_template.txt` / `think_template.txt` を読み込んで `appendText` を構築する
- * @returns `output`（AI出力テキスト）と `input`（実際に送信したテキスト）のペア
+ * @returns `output`（思考内容を除いたAI出力）、`input`（実際に送信したテキスト）、`think`（思考内容）、`rawOutput`（APIの生出力）のオブジェクト
  */
-export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, assistantOptions?: { userInput: string; thinkingMode: boolean }): Promise<{output: string, input: string}> {
+export async function queryServer(apiKey: string, document: vscode.TextDocument, parameters: object, activeDir: vscode.WorkspaceFolder | undefined = undefined, selections: vscode.Selection[] | undefined = undefined, assistantOptions?: { userInput: string; thinkingMode: boolean }): Promise<{output: string, input: string, think: string, rawOutput: string}> {
 	let input = '';
 	if (selections) {
 		let selectedText: string[] = [];
@@ -227,5 +227,31 @@ export async function queryServer(apiKey: string, document: vscode.TextDocument,
 		})
 	});
 	const body = Object(await res.json());
-	return { output: formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF), input };
+	const rawOutput = formatOutput(body.data[0], input, document.eol === vscode.EndOfLine.LF);
+	const thinkingMode = assistantOptions?.thinkingMode ?? false;
+
+	let think = '';
+	let output = rawOutput;
+	if (thinkingMode) {
+		const thinkEnd = rawOutput.indexOf('</think>');
+		if (thinkEnd !== -1) {
+			think = rawOutput.slice(0, thinkEnd);
+			output = rawOutput.slice(thinkEnd + '</think>'.length);
+		} else {
+			think = rawOutput;
+			output = '';
+		}
+	} else if (rawOutput.includes('<think>')) {
+		const thinkStart = rawOutput.indexOf('<think>');
+		const thinkEnd = rawOutput.indexOf('</think>');
+		if (thinkEnd !== -1 && thinkEnd > thinkStart) {
+			think = rawOutput.slice(thinkStart + '<think>'.length, thinkEnd);
+			output = rawOutput.slice(0, thinkStart) + rawOutput.slice(thinkEnd + '</think>'.length);
+		} else {
+			think = rawOutput.slice(thinkStart + '<think>'.length);
+			output = rawOutput.slice(0, thinkStart);
+		}
+	}
+
+	return { output, input, think, rawOutput };
 }
