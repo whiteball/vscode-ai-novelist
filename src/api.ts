@@ -3,6 +3,75 @@ import fetch from 'node-fetch';
 
 import { formatOutput, normalizeInput } from './format';
 
+/**
+ * `.ai_novelist/` ディレクトリ配下の設定ファイル群を一括作成する。
+ * 既に存在するファイル/ディレクトリはスキップする。
+ *
+ * @param config VS Codeのワークスペース設定（`ai_novelist_api` スコープ）
+ * @param activeDir 作成先のワークスペースフォルダ
+ * @returns `created`（作成したパス）と `skipped`（スキップしたパス）の配列
+ */
+export async function initializeWorkspaceFiles(
+	config: vscode.WorkspaceConfiguration,
+	activeDir: vscode.WorkspaceFolder
+): Promise<{ created: string[]; skipped: string[] }> {
+	const base = vscode.Uri.joinPath(activeDir.uri, '.ai_novelist');
+	const created: string[] = [];
+	const skipped: string[] = [];
+
+	async function pathExists(uri: vscode.Uri): Promise<boolean> {
+		try {
+			await vscode.workspace.fs.stat(uri);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	async function createFile(relativePath: string, content: string): Promise<void> {
+		const uri = vscode.Uri.joinPath(base, relativePath);
+		if (await pathExists(uri)) {
+			skipped.push(relativePath);
+		} else {
+			await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
+			created.push(relativePath);
+		}
+	}
+
+	async function createDir(relativePath: string): Promise<void> {
+		const uri = vscode.Uri.joinPath(base, relativePath);
+		if (await pathExists(uri)) {
+			skipped.push(relativePath + '/');
+		} else {
+			await vscode.workspace.fs.createDirectory(uri);
+			created.push(relativePath + '/');
+		}
+	}
+
+	await vscode.workspace.fs.createDirectory(base);
+
+	await createFile('param.json', JSON.stringify({ ...config.parameters }, null, 4));
+
+	const settingsContent = {
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		note_line: 3,
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		send_limit: config.get<number>('send_limit') ?? 0,
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		chara_book_search_range: config.get<number>('chara_book_search_range') ?? 2000,
+	};
+	await createFile('settings.json', JSON.stringify(settingsContent, null, 4));
+
+	await createFile('memory.txt', '');
+	await createFile('note.txt', '');
+	await createFile('instruct_template.txt', '[#ユーザー]\n{__note__}\n{__input__}\n[#アシスタント]\n{__think__}');
+	await createFile('think_template.txt', '<think>\n');
+	await createDir('chara_books');
+	await createDir('history');
+
+	return { created, skipped };
+}
+
 // refer: https://ai-novel.com/account_api_help.php
 
 /**

@@ -49,6 +49,10 @@
       {
         "command": "vscode-ai-novelist.getContinuationFromSelection",
         "title": "選択範囲の続きを書く(AIのべりすと)"
+      },
+      {
+        "command": "vscode-ai-novelist.initializeWorkspaceFiles",
+        "title": "ワークスペースファイルを作成(AIのべりすと)"
       }
     ],
     "menus": {

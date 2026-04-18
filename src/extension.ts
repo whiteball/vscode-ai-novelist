@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { loadParameters, queryServer } from './api';
+import { loadParameters, queryServer, initializeWorkspaceFiles } from './api';
 import { writeLogFile } from './logger';
 import { AssistantViewProvider } from './assistantViewProvider';
 
@@ -305,6 +305,24 @@ export function activate(context: vscode.ExtensionContext) {
 			retryButton.show();
 		})
 	));
+
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.initializeWorkspaceFiles', async () => {
+		const activeDir = vscode.workspace.workspaceFolders?.[0];
+		if (!activeDir) {
+			vscode.window.showErrorMessage('ワークスペースが開かれていません。');
+			return;
+		}
+		const config = vscode.workspace.getConfiguration('ai_novelist_api');
+		const { created, skipped } = await initializeWorkspaceFiles(config, activeDir);
+		const lines: string[] = [];
+		if (created.length > 0) {
+			lines.push('作成: ' + created.join(', '));
+		}
+		if (skipped.length > 0) {
+			lines.push('スキップ: ' + skipped.join(', '));
+		}
+		vscode.window.showInformationMessage(lines.length > 0 ? lines.join(' / ') : '対象ファイルはありません。');
+	}));
 
 	context.subscriptions.push(vscode.commands.registerCommand('vscode-ai-novelist.getContinuationFromSelection', () =>
 		executeApiCommand(true, async ({ editor, document, apiKey, parameters, activeDir }) => {
